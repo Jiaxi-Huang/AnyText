@@ -18,8 +18,8 @@ import argparse
 
 BBOX_MAX_NUM = 8
 img_save_folder = 'SaveImages'
-load_model = True
-
+load_model = False
+model_folder = 'dreamtoooth_model/'
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -44,7 +44,7 @@ def parse_args():
     parser.add_argument(
         "--model_path",
         type=str,
-        default='dreamtoooth_model/anytext_2.ckpt',
+        default=model_folder+'anytext_2.ckpt',
         help="load a specified anytext checkpoint"
     )
     args = parser.parse_args()
@@ -251,23 +251,22 @@ def resize_h(h, img1, img2):
 
 is_t2i = 'true'
 
-# 读取 configuration.json 文件
+# 读取 description.txt 文件
 def load_description_from_txt():
-    txt_path = "dreamtoooth_model/description.txt"  # 假设文件位于当前目录
+    txt_path = model_folder+"description.txt"  # 假设文件位于当前目录
     try:
         with open(txt_path, "r", encoding="utf-8") as file:
-            content = file.read().strip()  # 读取文件内容并去除多余空白
-            # 替换换行符为 HTML 的 <br> 标签
-            content_with_breaks = content.replace("\n", "<br>")
-            return content_with_breaks
+            lines = file.readlines()
+            return [line.strip() for line in lines]  # 读取文件内容并去除多余空白
     except FileNotFoundError:
-        return "Description file not found."
+        return ["Description file not found."]
     except Exception as e:
-        return f"Error reading description file: {str(e)}"
-
+        return [f"Error reading description file: {str(e)}"]
 
 # 加载描述信息
-description_text = load_description_from_txt()
+description_tags = load_description_from_txt()
+
+
 
 block = gr.Blocks(css='style.css', theme=gr.themes.Soft()).queue()
 
@@ -296,10 +295,13 @@ with block:
         with gr.Column():
             result_gallery = gr.Gallery(label='Result(结果)', show_label=True, preview=True, columns=2, allow_preview=True, height=600)
             result_info = gr.Markdown('', visible=False)
-            with gr.Row():
-                # 添加描述信息展示区域
-                gr.Markdown(f'<span style="color:silver;font-size:12px"> \
-<strong>Model Description:<br></strong> {description_text} </span>')
+            gr.Markdown(f'<span style="color:silver;font-size:12px"> \
+<strong>Model Tags<br></strong></span>')
+            tag_html = '<div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: left;"><br>'
+            for tag in description_tags:
+                tag_html += f'<span style="background-color: #624AFF; color: white; padding: 5px 10px; border-radius: 5px;">{tag}</span>'
+            tag_html += '<br></div>'
+            gr.HTML(tag_html)
         with left_part:
             with gr.Accordion('🕹Instructions(说明)', open=False,):
                 with gr.Tabs():
