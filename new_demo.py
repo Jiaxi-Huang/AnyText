@@ -44,7 +44,7 @@ def parse_args():
     parser.add_argument(
         "--model_path",
         type=str,
-        default=model_folder+'anytext_2.ckpt',
+        default=None,
         help="load a specified anytext checkpoint"
     )
     args = parser.parse_args()
@@ -252,20 +252,44 @@ def resize_h(h, img1, img2):
 is_t2i = 'true'
 
 # 读取 description.txt 文件
-def load_description_from_txt():
-    txt_path = model_folder+"description.txt"  # 假设文件位于当前目录
+def load_description_from_json():
+    """
+    从环境变量 MODELSCOPE_CACHE 中读取配置文件路径，并加载 description 字段。
+    """
+    # 获取环境变量 MODELSCOPE_CACHE
+    modelscope_cache = os.getenv('MODELSCOPE_CACHE')
+    
+    # 如果环境变量未设置，使用默认路径
+    if modelscope_cache is not None:
+        json_path = model_folder
+        json_path = os.path.join(json_path, "iic/cv_anytext_text_generation_editing/configuration.json")
+        print(f"环境变量 MODELSCOPE_CACHE 未设置，使用默认路径: {json_path}")
+    else:
+        # 拼接完整的 JSON 文件路径
+        json_path = os.path.join(modelscope_cache, "iic/cv_anytext_text_generation_editing/configuration.json")
+        print(f"从环境变量 MODELSCOPE_CACHE 构建路径: {json_path}")
+    
     try:
-        with open(txt_path, "r", encoding="utf-8") as file:
-            lines = file.readlines()
-            return [line.strip() for line in lines]  # 读取文件内容并去除多余空白
+        # 尝试打开并读取 JSON 文件
+        with open(json_path, "r", encoding="utf-8") as file:
+            config_data = json.load(file)
+        
+        # 提取 description 字段
+        description_tags = config_data.get("description", [])
+        if not isinstance(description_tags, list):
+            description_tags = [description_tags]  # 确保结果为列表
+        
+        return description_tags
+    
     except FileNotFoundError:
         return ["Description file not found."]
+    except json.JSONDecodeError:
+        return ["Failed to parse JSON file."]
     except Exception as e:
         return [f"Error reading description file: {str(e)}"]
 
-# 加载描述信息
-description_tags = load_description_from_txt()
-
+# 测试加载描述信息
+description_tags = load_description_from_json()
 
 
 block = gr.Blocks(css='style.css', theme=gr.themes.Soft()).queue()
@@ -282,13 +306,9 @@ with block:
                script.appendChild(text);
                document.head.appendChild(script);
                }}""")
-    gr.HTML('<div style="text-align: center; margin: 20px auto;"> \
-            <img id="banner" src="file/example_images/banner.png" alt="anytext"> <br>  \
-            [<a href="https://arxiv.org/abs/2311.03054" style="color:blue; font-size:18px;">arXiv</a>] \
-            [<a href="https://github.com/tyxsspa/AnyText" style="color:blue; font-size:18px;">Code</a>] \
-            [<a href="https://modelscope.cn/models/damo/cv_anytext_text_generation_editing/summary" style="color:blue; font-size:18px;">ModelScope</a>]\
-            [<a href="https://huggingface.co/spaces/modelscope/AnyText" style="color:blue; font-size:18px;">HuggingFace</a>]\
-            version: 1.1.3 </div>')
+    gr.Markdown('<div style="text-align: center; margin: 30px auto; padding: 15px; font-size: 24px; font-weight: bold; \
+            background-color: #624AFF; color: white; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);"> \
+            基于生成式AI的个性化文创图像作品设计 </div>')
     with gr.Row(variant='compact'):
         with gr.Column() as left_part:
             pass
@@ -296,7 +316,7 @@ with block:
             result_gallery = gr.Gallery(label='Result(结果)', show_label=True, preview=True, columns=2, allow_preview=True, height=600)
             result_info = gr.Markdown('', visible=False)
             gr.Markdown(f'<span style="color:silver;font-size:12px"> \
-<strong>Model Tags<br></strong></span>')
+<strong>模型特长：<br></strong></span>')
             tag_html = '<div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: left;"><br>'
             for tag in description_tags:
                 tag_html += f'<span style="background-color: #624AFF; color: white; padding: 5px 10px; border-radius: 5px;">{tag}</span>'
@@ -407,26 +427,7 @@ with block:
                         gr.Markdown("")
                     def exp_gen_click():
                         return [gr.Slider(value=512), gr.Slider(value=512)]  # all examples are 512x512, refresh draw_img
-                    with gr.Tab("English Examples"):
-                        exp_gen_en = gr.Examples(
-                            [
-                                ['A raccoon stands in front of the blackboard with the words "Deep Learning" written on it', "example_images/gen17.png", "Manual-draw(手绘)", "↕", False, 4, 33789703],
-                                ['A crayon drawing by child,  a snowman with a Santa hat, pine trees, outdoors in heavy snowfall, titled "Snowman"', "example_images/gen18.png", "Manual-draw(手绘)", "↕", False, 4, 35621187],
-                                ['A meticulously designed logo, a minimalist brain, stick drawing style, simplistic style,  refined with minimal strokes, black and white color, white background,  futuristic sense, exceptional design, logo name is "NextAI"', "example_images/gen19.png", "Manual-draw(手绘)", "↕", False, 4, 2563689],
-                                ['A photograph of the colorful graffiti art on the wall with the words "Hi~" "Get Ready" "to" "Party"', "example_images/gen21.png", "Manual-draw(手绘)", "↕", False, 4, 88952132],
-                                ['photo of caramel macchiato coffee on the table, top-down perspective, with "Any" "Text" written on it using cream', "example_images/gen9.png", "Manual-draw(手绘)", "↕", False, 4, 66273235],
-                                ['A fine sweater with knitted text: "Have" "A" "Good Day"', "example_images/gen20.png", "Manual-draw(手绘)", "↕", False, 4, 35107824],
-                                ['Sign on the clean building that reads "科学" and "과학"  and "ステップ" and "SCIENCE"', "example_images/gen6.png", "Manual-draw(手绘)", "↕", True, 4, 13246309],
-                                ['A delicate square cake, cream and fruit, with "CHEERS" "to the" and "GRADUATE" written in chocolate', "example_images/gen8.png", "Manual-draw(手绘)", "↕", False, 4, 93424638],
-                                ['A nice drawing in pencil of Michael Jackson,  with the words "Micheal" and "Jackson" written on it', "example_images/gen7.png", "Manual-draw(手绘)", "↕", False, 4, 83866922],
-                                ['a well crafted ice sculpture that made with "Happy" and "Holidays". Dslr photo, perfect illumination', "example_images/gen11.png", "Manual-draw(手绘)", "↕", True, 4, 64901362],
-                            ],
-                            [prompt, draw_img, pos_radio, sort_radio, revise_pos, img_count, seed],
-                            examples_per_page=5,
-                            label=''
-                        )
-                        exp_gen_en.dataset.click(exp_gen_click, None, [image_width, image_height])
-                    with gr.Tab("中文示例"):
+                    with gr.Tab("示例"):
                         exp_gen_ch = gr.Examples(
                             [
                                 ['一只浣熊站在黑板前，上面写着"深度学习"', "example_images/gen1.png", "Manual-draw(手绘)", "↕", False, 4, 81808278],
@@ -464,22 +465,7 @@ with block:
                         gr.Markdown("")
                         run_edit = gr.Button(value="Run(运行)!", scale=0.3, elem_classes='run')
                         gr.Markdown("")
-                    with gr.Tab("English Examples"):
-                        gr.Examples(
-                            [
-                                ['A Minion meme that says "wrong"', "example_images/ref15.jpeg", "example_images/edit15.png", 4, 39934684],
-                                ['A pile of fruit with "UIT" written in the middle', "example_images/ref13.jpg", "example_images/edit13.png", 4, 54263567],
-                                ['Characters written in chalk on the blackboard that says "DADDY"', "example_images/ref8.jpg", "example_images/edit8.png", 4, 73556391],
-                                ['The blackboard says "Here"', "example_images/ref11.jpg", "example_images/edit11.png", 2, 15353513],
-                                ['A letter picture that says "THER"', "example_images/ref6.jpg", "example_images/edit6.png", 4, 72321415],
-                                ['A cake with colorful characters that reads "EVERYDAY"', "example_images/ref7.jpg", "example_images/edit7.png", 4, 8943410],
-                                ['photo of clean sandy beach," " " "', "example_images/ref16.jpeg", "example_images/edit16.png", 4, 85664100],
-                            ],
-                            [prompt, ori_img, ref_img, img_count, seed],
-                            examples_per_page=5,
-                            label=''
-                        )
-                    with gr.Tab("中文示例"):
+                    with gr.Tab("示例"):
                         gr.Examples(
                             [
                                 ['精美的书法作品，上面写着“志” “存” “高” ”远“', "example_images/ref10.jpg", "example_images/edit10.png", 4, 98053044],
